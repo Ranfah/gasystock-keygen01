@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GasyStock — Clé d'activation</title>
+  <style>
+    body { font-family: sans-serif; max-width: 480px; margin: 40px auto; padding: 16px; background: #f8fafc; color: #1e293b; }
+    h1 { font-size: 1.2rem; margin-bottom: 24px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+    input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; margin-bottom: 16px; }
+    button { width: 100%; padding: 12px; background: #1e293b; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #334155; }
+    .result { margin-top: 20px; padding: 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: none; }
+    .key { font-size: 1.3rem; font-weight: bold; letter-spacing: 2px; color: #1e293b; word-break: break-all; }
+    .copy-btn { margin-top: 12px; width: 100%; padding: 8px; background: #e2e8f0; color: #1e293b; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+    .error { color: #dc2626; font-size: 0.85rem; margin-top: -12px; margin-bottom: 12px; }
+    #app { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="login">
+    <h1>🔐 Accès restreint</h1>
+    <label for="pwd">Mot de passe</label>
+    <input id="pwd" type="password" placeholder="••••••••" autocomplete="off" />
+    <p class="error" id="pwd-error"></p>
+    <button onclick="verifierMdp()">Accéder</button>
+  </div>
+
+  <div id="app">
+    <h1>🔑 GasyStock — Clé d'activation</h1>
+    <label for="machineId">Machine ID du client</label>
+    <input id="machineId" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off" />
+    <button onclick="generer()">Générer la clé</button>
+    <div class="result" id="result">
+      <label>Clé d'activation :</label>
+      <div class="key" id="key"></div>
+      <button class="copy-btn" onclick="copier()">Copier</button>
+    </div>
+  </div>
+
+<script>
+const PWD_HASH = "f8c8cb84af8a929320b24e65eda9a11a4f41811e43d9896a2c4c4025c5dae4b1";
+const SECRET   = "GASYSTOCK_STMG_XK9_2024_SECRET";
+
+const enc = new TextEncoder();
+
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest("SHA-256", enc.encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function hmacSha256(secret, message) {
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return new Uint8Array(sig);
+}
+
+async function verifierMdp() {
+  const pwd = document.getElementById('pwd').value;
+  const hash = await sha256hex(pwd);
+  if (hash === PWD_HASH) {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+  } else {
+    document.getElementById('pwd-error').textContent = 'Mot de passe incorrect';
+    document.getElementById('pwd').value = '';
+  }
+}
+
+async function generer() {
+  const machineId = document.getElementById('machineId').value.trim();
+  if (!machineId) { alert("Entrez le Machine ID"); return; }
+  const digest = await hmacSha256(SECRET, machineId);
+  const hex = Array.from(digest.slice(0,10)).map(b => b.toString(16).padStart(2,'0').toUpperCase()).join('');
+  const key = hex.match(/.{1,4}/g).join('-');
+  document.getElementById('key').textContent = key;
+  document.getElementById('result').style.display = 'block';
+}
+
+function copier() {
+  const key = document.getElementById('key').textContent;
+  navigator.clipboard?.writeText(key).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copié !';
+    setTimeout(() => btn.textContent = 'Copier', 2000);
+  }).catch(() => window.prompt("Copier la clé :", key));
+}
+
+document.getElementById('pwd').addEventListener('keydown', e => { if (e.key === 'Enter') verifierMdp(); });
+</script>
+</body>
+</html>
